@@ -47,6 +47,14 @@
    =>
    (assert (checking-process (equation ?name) (remainder $?reactants) (checking-generation ?gen))))
 
+(defrule MAIN::donot-start-checking
+   (environment (checking-generation ?gen) (catalyzers $?catas) (action $?actions))
+   ?equ <- (equation (catalyzers $?catalyzers) (condition $?condition) (checking-generation ?equgen&:(< ?equgen ?gen)))
+   (not (and (subsetp $?catalyzers $?catas)
+             (subsetp $?condition $?actions)))
+   =>
+   (modify ?equ (checking-generation ?gen)))
+
 (defrule MAIN::checking-exist
    ?p <- (checking-process (equation ?equation) (remainder ?f $?remainder) (pending TRUE) (ratio ?ratio))
    (material (name ?f) (amount ?amount&:(> ?amount 0)))
@@ -113,7 +121,7 @@
    (retract ?rp))
 
 (defrule MAIN::auto-generation
-   ?env <- (environment (checking-generation ?gen))
+   ?env <- (environment (checking-generation ?gen) (catalyzers $?catas) (action $?actions))
    (not (reaction-process))
    (checking-process (reacted TRUE) (checking-generation ?gen))
    (not (equation (checking-generation ?equgen&:(< ?equgen ?gen))))
@@ -138,10 +146,17 @@
             TRUE
             (printout t "m(" ?m:name ") = " ?m:amount " mol" crlf))
          (retract ?a))
+      (case savem then
+         (save-facts "material.dat" local material)
+         (printout t "done" crlf)
+         (retract ?a))
+      (case loadm then
+         (load-facts "material.dat")
+         (retract ?a))
       (case run then
          (do-for-fact ((?e environment))
             TRUE
-            (modify ?e (checking-generation (+ ?e:checking-generation 1))))
+            (modify ?e (checking-generation (+ ?e:checking-generation 5))))
          (retract ?a))
       (case adde then
          (bind ?name (gensym*))
@@ -162,7 +177,12 @@
          (bind ?condition (explode$ (readline)))
          (assert (equation (name ?name) (reactants ?r) (reactant-ratio ?r-r) (products ?p) (product-ratio ?r-p) (catalyzers ?catalyzers) (condition ?condition) (checking-generation ?gen)))
          (retract ?a))
-      (case environment then
+      (case printe then
+         (do-for-all-facts ((?e equation))
+            TRUE
+            (printout t ?e:reactants " * " ?e:reactant-ratio " = " ?e:products " * " ?e:product-ratio " ,catalyzed by " ?e:catalyzers " ,with " ?e:condition crlf))
+         (retract ?a))
+      (case env then
          (printout t "ACTION> ")
          (bind ?condition (explode$ (readline)))
          (printout t "CATALYZERS> ")
@@ -170,6 +190,12 @@
          (do-for-fact ((?e environment))
             TRUE
             (modify ?e (action ?condition) (catalyzers ?catalyzers)))
+         (retract ?a))
+      (case printenv then
+         (do-for-fact ((?env environment))
+            TRUE
+            (printout t "action = " ?env:action crlf)
+            (printout t "catalyzers = " ?env:catalyzers crlf))
          (retract ?a))
       (case saverule then
          (save "main.clp")
@@ -187,19 +213,22 @@
          (printout t "[help] - to view help information" crlf)
          (printout t "[addm] - to add materials to the laboratory" crlf)
          (printout t "[printm] - to view current materials in the laboratory" crlf)
+         (printout t "[savem] - to save current material information to material.dat" crlf)
+         (printout t "[loadm] - to load material information from material.dat" crlf)
          (printout t "[run] - to start reaction" crlf)
          (printout t "[adde] - to add chemical equation" crlf)
-         (printout t "[environment] - to change environment condition" crlf)
+         (printout t "[env] - to change environment condition" crlf)
+         (printout t "[printenv] - to printout environment information" crlf)
          (printout t "[halt] - to exit without saving" crlf)
          (printout t "[saverule] - to save the whole program structure into main.clp" crlf)
-         (printout t "[exit] - to save the equation facts and exit" crlf)
+         (printout t "[exit] - to save the equation facts to equation.dat and exit" crlf)
          (retract ?a))
       (default 
          (printout t "USER> ")
          (modify ?a (target (read))))))
 
 (defrule MAIN::material-exist
-   ?a <- (action (target material))
+   ?a <- (action (target addm))
    ?am <- (add-material ?name ?amount)
    ?m <- (material (name ?name) (amount ?prev))
    =>
@@ -207,7 +236,7 @@
    (retract ?am ?a))
 
 (defrule MAIN::material-nonexist
-   ?a <- (action (target material))
+   ?a <- (action (target addm))
    ?am <- (add-material ?name ?amount)
    (not (material (name ?name)))
    =>

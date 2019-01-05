@@ -1,0 +1,4 @@
+(material (name "NH3") (amount 10))
+(material (name "H2O") (amount 100))
+(material (name "CO2") (amount 10))
+(material (name "NaCl") (amount 10))
