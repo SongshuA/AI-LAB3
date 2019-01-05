@@ -6,9 +6,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
 (deftemplate equation
-    (slot name (type STRING))
+    (slot name (type SYMBOL))
     (multislot reactant-ratio (type INTEGER))
     (multislot reactants)
     (multislot product-ratio (type INTEGER))
@@ -33,7 +32,7 @@
 
 
 (deftemplate checking-process
-    (slot equation)
+    (slot equation (type SYMBOL))
     (multislot remainder (type STRING))
     (slot pending (allowed-values TRUE FALSE) (default TRUE))
     (slot ratio (type NUMBER) (default 100))
@@ -43,7 +42,7 @@
 
 
 (deftemplate reaction-process
-    (slot equation (type STRING))
+    (slot equation (type SYMBOL))
     (multislot r-reactants (type STRING))
     (multislot r-products (type STRING))
     (slot ratio (type NUMBER))
@@ -118,7 +117,7 @@
 )
 
 (defrule reaction-cost
-    ?rp <- (reaction-process (equation ?equation) (r-reactants ?f $?remainder) (ratio ?ratio) (checking-generation ?gen))
+    ?rp <- (reaction-process (equation ?equation) (r-reactants ?f $?remainder) (ratio ?ratio))
     ?m <- (material (name ?f) (amount ?amount))
     (equation (name ?equation) (reactant-ratio $?ratios) (reactants $?reactants))
     =>
@@ -164,8 +163,6 @@
 )
 
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; flow control part
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -188,29 +185,29 @@
     ?a <- (action (target ?target))
     =>
     (switch ?target
-        (case material then 
+        (case addm then 
             (printout t "MATERIAL> ")
             (assert (add-material (explode$ (readline))))
         )
         
-        (case print then 
-            (do-for-all-facts ((?m material)) (= 1 1)
+        (case printm then 
+            (do-for-all-facts ((?m material)) TRUE
                 (printout t "m(" ?m:name ") = " ?m:amount " mol" crlf)
             )
             (retract ?a)
         )
 
         (case run then
-            (do-for-fact ((?e environment)) (= 1 1)
+            (do-for-fact ((?e environment)) TRUE
                 (modify ?e (checking-generation (+ ?e:checking-generation 1)))
             )
             (retract ?a)
         )
 
-        (case equation then
-            (bind ?name (gensym))
+        (case adde then
+            (bind ?name (gensym*))
 
-            (do-for-fact ((?e environment)) (= 1 1)
+            (do-for-fact ((?e environment)) TRUE
                 (bind ?gen ?e:checking-generation)
             )
 
@@ -245,14 +242,47 @@
             (retract ?a)
         )
 
-        (case save then 
-            (printout t "PATH> ")
-            (bind ?path (read))
-            (save ?path)
+        (case environment then
+            (printout t "ACTION> ")
+            (bind ?condition (explode$ (readline)))
+            (printout t "CATALYZERS> ")
+            (bind ?catalyzers (explode$ (readline)))
+            (do-for-fact ((?e environment)) TRUE
+                (modify ?e (action ?condition) (catalyzers ?catalyzers))
+            )
             (retract ?a)
         )
 
-        (case exit then none)
+        (case saverule then 
+            (save "main.clp")
+            (printout t "done" crlf)
+            (retract ?a)
+        )
+
+        (case halt then none)
+
+        (case exit then 
+            ; reset equation
+            (bind ?list (find-all-facts ((?equ equation)) TRUE))
+            (foreach ?equ ?list
+                (modify ?equ (checking-generation 0))
+            )
+            ; save to file
+            (save-facts "equation.dat" local equation)
+        )
+
+        (case help then
+            (printout t "[help] - to view help information" crlf)
+            (printout t "[addm] - to add materials to the laboratory" crlf)
+            (printout t "[printm] - to view current materials in the laboratory" crlf)
+            (printout t "[run] - to start reaction" crlf)
+            (printout t "[adde] - to add chemical equation" crlf)
+            (printout t "[environment] - to change environment condition" crlf)
+            (printout t "[halt] - to exit without saving" crlf)
+            (printout t "[saverule] - to save the whole program structure into main.clp" crlf)
+            (printout t "[exit] - to save the equation facts and exit" crlf)
+            (retract ?a)
+        )
 
         (default
             (printout t "USER> ")
@@ -272,6 +302,7 @@
     (retract ?am ?a)
 )
 
+
 (defrule material-nonexist
     ?a <- (action (target material))
     ?am <- (add-material ?name ?amount)
@@ -286,47 +317,33 @@
     (environment
         (checking-generation 1)
         (catalyzers)
-        (action heating ignite)
+        (action)
     )
 )
 
-; (assert 
-;     (environment
-;         (checking-generation 1)
-;         (catalyzers)
-;         (action heating ignite)
-;     )
-
-;     (material
-;         (name "C")
-;         (amount 3)
-;     )
-;     (material
-;         (name "S")
-;         (amount 3)
-;     )
-;     (material
-;         (name "O2")
-;         (amount 2)
-;     )
-
-;     (equation
-;         (name "E1")
-;         (reactant-ratio 1 1)
-;         (reactants "C" "O2")
-;         (product-ratio 1)
-;         (products "CO2")
-;         (condition ignite)
-;     )
-;     (equation
-;         (name "E2")
-;         (reactant-ratio 1 1)
-;         (reactants "S" "O2")
-;         (product-ratio 1)
-;         (products "SO2")
-;         (condition ignite)
-;     )
-; )
+(assert
+    (environment
+        (checking-generation 1)
+        (catalyzers)
+        (action heating ignite)
+    )
+    (material
+        (name "C")
+        (amount 3)
+    )
+    (material
+        (name "O2")
+        (amount 3)
+    )
+    (equation
+        (name gen1)
+        (reactant-ratio 1 1)
+        (reactants "C" "O2")
+        (product-ratio 1)
+        (products "CO2")
+        (condition ignite)
+    )
+)
 
 
 (run)

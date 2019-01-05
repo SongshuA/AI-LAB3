@@ -1,0 +1,2 @@
+(equation (name gen2) (reactant-ratio 1 1) (reactants "C" "O2") (product-ratio 1) (products "CO2") (catalyzers) (condition ignite) (checking-generation 0))
+(equation (name gen1) (reactant-ratio 1 1) (reactants "S" "O2") (product-ratio 1) (products "SO2") (catalyzers) (condition ignite) (checking-generation 0))
